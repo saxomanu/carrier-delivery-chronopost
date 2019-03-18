@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
 #
 #    Author: Florian da Costa
@@ -19,17 +18,16 @@
 #
 ##############################################################################
 
-from openerp.osv import orm, fields
+from odoo import models, fields, api
 
 
-class DeliveryCarrier(orm.Model):
+class DeliveryCarrier(models.Model):
     """ Add service group """
     _inherit = 'delivery.carrier'
 
-    def _get_carrier_type_selection(self, cr, uid, context=None):
+    def _selection_carrier_type(self):
         """ Add Chronopost carrier type """
-        res = super(DeliveryCarrier, self)._get_carrier_type_selection(
-            cr, uid, context=context)
+        res = super(DeliveryCarrier, self)._selection_carrier_type()
         res.append(('chronopost', 'Chronopost'))
         return res
 
@@ -43,12 +41,10 @@ CHRONOPOST_OPTIONS_TYPES = [
 ]
 
 
-class DeliveryCarrierTemplateOption(orm.Model):
+class DeliveryCarrierTemplateOption(models.Model):
     """ Set name translatable and add service group """
     _inherit = 'delivery.carrier.template.option'
 
-    _columns = {
-        'chronopost_type': fields.selection(
+    chronopost_type = fields.Selection(
             CHRONOPOST_OPTIONS_TYPES,
-            string="Chronopost option type"),
-    }
+            string="Chronopost option type") 

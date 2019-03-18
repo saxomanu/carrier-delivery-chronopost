@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
 #
 #    Author: Florian da Costa
@@ -19,13 +18,11 @@
 #
 ##############################################################################
 
-from openerp.osv import orm, fields
+from odoo import models, fields, api
 
 
-class ResCompany(orm.Model):
+class ResCompany(models.Model):
     _inherit = 'res.company'
 
-    _columns = {
-        'chronopost_account_ids': fields.one2many(
-            'chronopost.account', 'company_id', 'Chronopost Accounts'),
-        }
+    chronopost_account_ids = fields.One2many(
+            'chronopost.account', 'company_id', 'Chronopost Accounts')

@@ -19,8 +19,7 @@
 #
 ##############################################################################
 
-from openerp.osv import orm
-from openerp.tools.translate import _
+from odoo import models, fields, api, _
 from chronopost_api.chronopost import Chronopost
 from datetime import datetime
 from chronopost_api.exception_helper import (
@@ -29,6 +28,11 @@ from chronopost_api.exception_helper import (
     InvalidValueNotInList,
     InvalidMissingField,
     )
+
+import base64
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 def map_exception_msg(message):
@@ -44,7 +48,7 @@ def map_exception_msg(message):
     return message
 
 
-class ChronopostPrepareWebservice(orm.AbstractModel):
+class ChronopostPrepareWebservice(models.AbstractModel):
     _name = 'chronopost.prepare.webservice'
 
     _CHRONOPOST_PRODUCT = {
@@ -58,7 +62,7 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
         'chrel': '86'
     }
 
-    def _prepare_address(self, cr, uid, partner, context=None):
+    def _prepare_address(self, partner):
         address = {}
         elms = ['street', 'street2', 'zip', 'city', 'phone', 'mobile', 'email']
         for elm in elms:
@@ -77,10 +81,9 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
                 address['country_name'] = partner.country_id.name
         return address
 
-    def _prepare_recipient(self, cr, uid, picking, context=None):
+    def _prepare_recipient(self, picking):
         partner = picking.partner_id
-        recipient_data = self._prepare_address(
-            cr, uid, partner, context=context)
+        recipient_data = self._prepare_address(partner)
         recipient_data['name2'] = partner.name
         if partner.is_company and partner.child_ids:
             recipient_data['name'] = partner.child_ids[0].name
@@ -90,11 +93,9 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
                                       picking, 'recipient_alert') or 0)
         return recipient_data
 
-    def _prepare_shipper(self, cr, uid, picking, context=None):
-        picking_out_obj = self.pool['stock.picking.out']
-        partner = picking_out_obj._get_label_sender_address(
-            cr, uid, picking, context=context)
-        shipper_data = self._prepare_address(cr, uid, partner, context=context)
+    def _prepare_shipper(self, picking):
+        partner = picking._get_label_sender_address()
+        shipper_data = self._prepare_address(partner)
         if partner.parent_id:
             shipper_data['name'] = partner.name
             shipper_data['name2'] = partner.parent_id.name
@@ -106,14 +107,14 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
             picking, 'shipper_alert') or 0)
         return shipper_data
 
-    def _prepare_customer(self, cr, uid, picking, context=None):
+    def _prepare_customer(self, picking):
         """
         Use this method in case the shipper address is different
         from the customer address
         """
         return None
 
-    def _prepare_basic_ref(self, cr, uid, picking, context=None):
+    def _prepare_basic_ref(self, picking):
         ref_data = {
             'shipperRef': picking.name,
             #TODO in the 'recipientRef' field, we are suppose to write
@@ -129,7 +130,7 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
         assert len(option) <= 1
         return option and option[0]
 
-    def _complete_skybill(self, cr, uid, moves, context=None):
+    def _complete_skybill(self, moves):
         res = {}
         picking = moves[0].picking_id
         res['weight'] = sum(move.weight for move in moves)
@@ -143,7 +144,7 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
             res['customsValue'] = product_total or None
         return res
 
-    def _prepare_basic_skybill(self, cr, uid, picking, options, context=None):
+    def _prepare_basic_skybill(self, picking, options):
         skybill_data = {
             'productCode': self._CHRONOPOST_PRODUCT[picking.carrier_id.code],
             'shipDate': datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
@@ -157,7 +158,7 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
             picking, 'object_type') or 'MAR'
         return skybill_data
 
-    def _prepare_esd(self, cr, uid, track, context=None):
+    def _prepare_esd(self, track):
         # TODO
         esd_data = {
             'height': 0,
@@ -166,9 +167,8 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
             }
         return esd_data
 
-    def _prepare_account(self, cr, uid, chrono_config, picking, context=None):
-        if context is None:
-            context = {}
+    def _prepare_account(self, chrono_config, picking):
+
         sub_account = chrono_config.sub_account or False
         account = chrono_config.account_id.account
         password = chrono_config.account_id.password
@@ -179,10 +179,10 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
             'accountNumber': account,
             'subAccount': sub_account,
         }
-        context['chrono_account_name'] = name
+        #context['chrono_account_name'] = name
         return header_data, password, mode
 
-    def get_chronopost_account(self, cr, uid, company, pick, context=None):
+    def get_chronopost_account(self, company, pick):
         """
             If your company use more than one chronopost account, implement
             your method to return the right one depending of your picking.
@@ -190,21 +190,19 @@ class ChronopostPrepareWebservice(orm.AbstractModel):
         return NotImplementedError
 
 
-class StockPicking(orm.Model):
+class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
-    def _generate_chronopost_label(
-            self, cr, uid, picking, tracking_ids=None, context=None):
+    def _generate_chronopost_label(self, picking, tracking_ids=None):
         """ Generate labels and write tracking numbers received """
-        chronopost_obj = self.pool['chronopost.prepare.webservice']
+        chronopost_obj = self.env['chronopost.prepare.webservice']
         company = picking.company_id
         options = [o.tmpl_option_id.name for o in picking.option_ids]
         if company.chronopost_account_ids:
             if len(company.chronopost_account_ids) == 1:
                 chrono_config = company.chronopost_account_ids[0]
             else:
-                chrono_config = chronopost_obj.get_chronopost_account(
-                    cr, uid, company, picking, context=context)
+                chrono_config = chronopost_obj.get_chronopost_account(company, picking)
         else:
             raise orm.except_orm(
                 _('Error'),
@@ -215,32 +213,26 @@ class StockPicking(orm.Model):
             # no tracking_id wil return a False, meaning that
             # we want a label for the picking
             trackings = sorted(set(
-                line.tracking_id if line.tracking_id else False
-                for line in picking.move_lines))
+                line.package_id.parcel_tracking if line.package_id and line.package_id.parcel_tracking else False
+                for line in picking.move_line_ids))
         else:
             # restrict on the provided trackings
-            tracking_obj = self.pool['stock.tracking']
-            trackings = tracking_obj.browse(cr, uid, tracking_ids,
-                                            context=context)
+            tracking_obj = self.env['stock.quant.package']
+            trackings = tracking_obj.browse(tracking_ids)
 
         #get options
         if picking.option_ids:
             options = [o.tmpl_option_id.name for o in picking.option_ids]
         #prepare webservice datas
-        recipient_data = chronopost_obj._prepare_recipient(
-            cr, uid, picking, context=context)
-        customer_data = chronopost_obj._prepare_customer(
-            cr, uid, picking, context=context)
+        recipient_data = chronopost_obj._prepare_recipient(picking)
+        customer_data = chronopost_obj._prepare_customer(picking)
 
         header_data, password, mode = chronopost_obj._prepare_account(
-            cr, uid, chrono_config, picking, context=context)
-        shipper_data = chronopost_obj._prepare_shipper(
-            cr, uid, picking, context=context)
+            chrono_config, picking)
+        shipper_data = chronopost_obj._prepare_shipper(picking)
 
-        ref_data = chronopost_obj._prepare_basic_ref(
-            cr, uid, picking, context=context)
-        skybill_data = chronopost_obj._prepare_basic_skybill(
-            cr, uid, picking, options, context=context)
+        ref_data = chronopost_obj._prepare_basic_ref(picking)
+        skybill_data = chronopost_obj._prepare_basic_skybill(picking, options)
         labels = []
         for track in trackings:
             if not track:
@@ -253,18 +245,15 @@ class StockPicking(orm.Model):
                 if len(trackings) > 1:
                     continue
                 moves = [move for move in picking.move_lines]
-                skybill_data.update(chronopost_obj._complete_skybill(
-                    cr, uid, moves, context=context))
+                skybill_data.update(chronopost_obj._complete_skybill(moves))
                 # skybill_data['weight'] += sum(
                 #   move.weight for move in picking.move_lines)
             else:
-                moves = track.move_ids
-                skybill_data.update(chronopost_obj._complete_skybill(
-                    cr, uid, moves, context=context))
+                moves = track.move_line_ids
+                skybill_data.update(chronopost_obj._complete_skybill(moves))
                 ref_data['customerSkybillNumber'] = track.name
             if chrono_config.use_esd:
-                esd_data = chronopost_obj._prepare_esd(
-                    cr, uid, track, context=context)
+                esd_data = chronopost_obj._prepare_esd(track)
             else:
                 esd_data = None
             try:
@@ -279,6 +268,7 @@ class StockPicking(orm.Model):
                 msg = map_exception_msg(e.message)
                 raise orm.except_orm('Error', msg)
             label = resp['value']
+            _logger.info("Retour API %r" % label)
             if label['errorCode'] != 0:
                 try:
                     error = ''.join(label['errorMessage'])
@@ -289,44 +279,35 @@ class StockPicking(orm.Model):
             # copy tracking number on picking if only one pack or
             # in tracking if several packs
             tracking_number = label['skybillNumber']
-            if not track:
-                self.write(cr, uid, picking.id,
-                           {'carrier_tracking_ref': tracking_number},
-                           context=context)
-            else:
-                track.write({'serial': tracking_number})
+            for line in picking.move_line_ids:
+                if line.package_id and not line.package_id.parcel_tracking: 
+                    line.package_id.parcel_tracking = tracking_number
 
             file_type = 'pdf' if mode != 'ZPL' else 'zpl'
             labels.append({
-                'file': label['skybill'].decode('base64'),
+                'file': base64.b64decode(label['skybill']),
                 'tracking_id': track.id if track else False,
                 'file_type': file_type,
                 'name': tracking_number + '.' + file_type,
             })
         return labels
 
-    def generate_shipping_labels(self, cr, uid, ids, tracking_ids=None,
-                                 context=None):
+    def generate_shipping_labels(self, tracking_ids=None):
         """ Add label generation for Chronopost """
-        if isinstance(ids, (long, int)):
-            ids = [ids]
-        assert len(ids) == 1
-        picking = self.browse(cr, uid, ids[0], context=context)
+        self.ensure_one()
 
-        if picking.carrier_id and picking.carrier_id.type == 'chronopost':
-            return self._generate_chronopost_label(
-                cr, uid, picking,
-                tracking_ids=tracking_ids,
-                context=context)
-        return super(StockPicking, self).generate_shipping_labels(
-            cr, uid, ids, tracking_ids=tracking_ids, context=context)
+        picking = self
+
+        if picking.carrier_id and picking.carrier_id.carrier_type == 'chronopost':
+            return self._generate_chronopost_label(picking, tracking_ids=tracking_ids)
+        return super(StockPicking, self).generate_shipping_labels(package_ids=tracking_ids)
 
 
-class ShippingLabel(orm.Model):
+class ShippingLabel(models.Model):
     """ Child class of ir attachment to identify which are labels """
     _inherit = 'shipping.label'
 
-    def _get_file_type_selection(self, cr, uid, context=None):
+    def _get_file_type_selection(self):
         """ Return a concatenated list of extensions of label file format
         plus file format from super
 
@@ -335,8 +316,7 @@ class ShippingLabel(orm.Model):
         :return: list of tuple (code, name)
 
         """
-        file_types = super(ShippingLabel, self
-                           )._get_file_type_selection(cr, uid, context=context)
+        file_types = super(ShippingLabel, self)._get_file_type_selection()
         new_types = [('zpl', 'ZPL')]
         file_types.extend(new_types)
         return file_types

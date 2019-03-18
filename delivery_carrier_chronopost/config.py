@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 ##############################################################################
 #
 #    Author: Florian da Costa
@@ -20,47 +19,41 @@
 ##############################################################################
 
 
-from openerp.osv import orm, fields
-from . company import ResCompany
+from odoo import models, fields, api
 
 
-class CarrierAccount(orm.Model):
+class CarrierAccount(models.Model):
     _inherit = 'carrier.account'
 
-    def _get_carrier_type(self, cr, uid, context=None):
+    def _selection_carrier_type(self):
         """ To inherit to add carrier type like Chronopost, Postlogistics..."""
-        res = super(CarrierAccount, self)._get_carrier_type(
-            cr, uid, context=context)
+        res = super(CarrierAccount, self)._selection_carrier_type()
         res.append(('chronopost', 'Chronopost'))
         return res
 
-    def _get_file_format(self, cr, uid, context=None):
+    def _selection_file_format(self):
         """ To inherit to add carrier type like Chronopost, Postlogistics..."""
-        res = super(CarrierAccount, self)._get_file_format(
-            cr, uid, context=context)
+        res = super(CarrierAccount, self)._selection_file_format()
         res.extend((('SPD', 'SPD'),
                    ('PPR', 'PPR'),
                    ('THE', 'THE')))
         return res
 
 
-class ChronopostAccount(orm.Model):
+class ChronopostAccount(models.Model):
     _name = 'chronopost.account'
     _description = 'Chronopost Account'
     _inherits = {'carrier.account': 'account_id'}
     _rec_name = 'account_id'
-    _columns = {
-        'account_id': fields.many2one(
-            'carrier.account', 'Main Account',
-            ondelete="cascade", required=True),
-        'sub_account': fields.char('Sub Account Number', size=3),
-        'company_id': fields.many2one('res.company', 'Company'),
-        'use_esd': fields.boolean('Use ESD'),
-    }
-
-
-class ChronopostConfig(orm.Model):
-    _name = 'chronopost.config'
-    _inherit = ['res.config.settings', 'abstract.config.settings']
-    _prefix = 'chronopost_'
-    _companyObject = ResCompany
+    
+    account_id = fields.Many2one('carrier.account', 'Main Account',
+            ondelete="cascade", required=True)
+    sub_account = fields.Char('Sub Account Number', size=3)
+    company_id = fields.Many2one('res.company', 'Company')
+    use_esd = fields.Boolean('Use ESD')
+ 
+#class ChronopostConfig(orm.Model):
+#    _name = 'chronopost.config'
+#    _inherit = ['res.config.settings', 'abstract.config.settings']
+#    _prefix = 'chronopost_'
+#    _companyObject = ResCompany

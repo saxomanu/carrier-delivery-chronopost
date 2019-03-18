@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<openerp>
+<odoo>
   <data noupdate="1">
     <record id="chronopost_partner" model="res.partner">
       <field name="name">Chronopost</field>
@@ -15,4 +15,4 @@
       <field name="vat">FR82383960135</field>
     </record>
   </data>
-</openerp>
+</odoo>
