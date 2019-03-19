@@ -25,9 +25,9 @@ from odoo import models, fields, api
 class CarrierAccount(models.Model):
     _inherit = 'carrier.account'
 
-    def _selection_carrier_type(self):
+    def _get_carrier_type(self):
         """ To inherit to add carrier type like Chronopost, Postlogistics..."""
-        res = super(CarrierAccount, self)._selection_carrier_type()
+        res = super(CarrierAccount, self)._get_carrier_type()
         res.append(('chronopost', 'Chronopost'))
         return res
 
