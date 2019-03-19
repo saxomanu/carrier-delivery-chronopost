@@ -26,3 +26,4 @@ class ResCompany(models.Model):
 
     chronopost_account_ids = fields.One2many(
             'chronopost.account', 'company_id', 'Chronopost Accounts')
+

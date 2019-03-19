@@ -25,9 +25,9 @@ class DeliveryCarrier(models.Model):
     """ Add service group """
     _inherit = 'delivery.carrier'
 
-    def _selection_carrier_type(self):
+    def _get_carrier_type_selection(self):
         """ Add Chronopost carrier type """
-        res = super(DeliveryCarrier, self)._selection_carrier_type()
+        res = super(DeliveryCarrier, self)._get_carrier_type_selection()
         res.append(('chronopost', 'Chronopost'))
         return res
 
