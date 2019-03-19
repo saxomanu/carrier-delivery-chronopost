@@ -56,6 +56,7 @@ class ChronopostPrepareWebservice(models.AbstractModel):
         'ch9': '76',
         'ch10': '02',
         'ch13': '01',
+        'ch13is': '1S',
         'ch18': '16',
         'chexp': '17',
         'chcla': '44',
@@ -130,14 +131,15 @@ class ChronopostPrepareWebservice(models.AbstractModel):
         assert len(option) <= 1
         return option and option[0]
 
-    def _complete_skybill(self, moves):
+    def _complete_skybill(self, weight, moves, rank):
         res = {}
         picking = moves[0].picking_id
-        res['weight'] = sum(move.weight for move in moves)
+        res['weight'] = weight
         product_total = int(sum(
             m.sale_line_id.price_subtotal if m.sale_line_id
             else 0 for m in moves)
             * 100)
+        res['skybillRank'] = rank
         if self._get_single_option(picking, 'insurance'):
             res['insuredValue'] = product_total or None
         if picking.carrier_id.name == "Chrono Express":
@@ -152,6 +154,7 @@ class ChronopostPrepareWebservice(models.AbstractModel):
             'weightUnit': 'KGM',
             #'codValue': TODO
         }
+        skybill_data['bulkNumber'] = picking.number_of_packages
         skybill_data['service'] = self._get_single_option(
             picking, 'service') or '0'
         skybill_data['objectType'] = self._get_single_option(
@@ -193,7 +196,7 @@ class ChronopostPrepareWebservice(models.AbstractModel):
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
-    def _generate_chronopost_label(self, picking, tracking_ids=None):
+    def _generate_chronopost_label(self, picking, package_ids=None):
         """ Generate labels and write tracking numbers received """
         chronopost_obj = self.env['chronopost.prepare.webservice']
         company = picking.company_id
@@ -208,17 +211,19 @@ class StockPicking(models.Model):
                 _('Error'),
                 _("You have to configurate a chronopost account "
                   "for your company"))
-        if tracking_ids is None:
-            # get all the trackings of the picking
-            # no tracking_id wil return a False, meaning that
-            # we want a label for the picking
-            trackings = sorted(set(
-                line.package_id.parcel_tracking if line.package_id and line.package_id.parcel_tracking else False
-                for line in picking.move_line_ids))
+
+        if not package_ids:
+            package_label_ids = self.pack_operation_product_ids.mapped('result_package_id')
         else:
-            # restrict on the provided trackings
-            tracking_obj = self.env['stock.quant.package']
-            trackings = tracking_obj.browse(tracking_ids)
+            package_label_ids = self.pack_operation_product_ids.mapped('result_package_id').filtered(lambda r: r.id in package_ids.ids)
+
+        nb_colis = len(package_label_ids)
+        if nb_colis != 0:
+            self.number_of_packages = nb_colis
+        else:
+            self.number_of_packages = 1
+
+
 
         #get options
         if picking.option_ids:
@@ -234,26 +239,12 @@ class StockPicking(models.Model):
         ref_data = chronopost_obj._prepare_basic_ref(picking)
         skybill_data = chronopost_obj._prepare_basic_skybill(picking, options)
         labels = []
-        for track in trackings:
-            if not track:
-                # ignore lines without tracking when there is tracking
-                # in a picking
-                # Example: if I have 1 move with a tracking and 1
-                # without, I will have [False, a_tracking] in
-                # `trackings`. In that case, we are using packs, not the
-                # picking for the tracking numbers.
-                if len(trackings) > 1:
-                    continue
-                moves = [move for move in picking.move_lines]
-                skybill_data.update(chronopost_obj._complete_skybill(moves))
-                # skybill_data['weight'] += sum(
-                #   move.weight for move in picking.move_lines)
-            else:
-                moves = track.move_line_ids
-                skybill_data.update(chronopost_obj._complete_skybill(moves))
-                ref_data['customerSkybillNumber'] = track.name
+
+        if not package_label_ids:
+            moves = [move for move in picking.move_lines]
+            skybill_data.update(chronopost_obj._complete_skybill(picking.shipping_weight, moves, 1))
             if chrono_config.use_esd:
-                esd_data = chronopost_obj._prepare_esd(track)
+                esd_data = chronopost_obj._prepare_esd(moves)
             else:
                 esd_data = None
             try:
@@ -279,9 +270,7 @@ class StockPicking(models.Model):
             # copy tracking number on picking if only one pack or
             # in tracking if several packs
             tracking_number = label['skybillNumber']
-            for line in picking.move_line_ids:
-                if line.package_id and not line.package_id.parcel_tracking: 
-                    line.package_id.parcel_tracking = tracking_number
+            self.carrier_tracking_ref = tracking_number
 
             file_type = 'pdf' if mode != 'ZPL' else 'zpl'
             labels.append({
@@ -290,17 +279,59 @@ class StockPicking(models.Model):
                 'file_type': file_type,
                 'name': tracking_number + '.' + file_type,
             })
+        rank = 0
+        for pack in package_label_ids:
+            rank += 1
+            moves = [move for move in picking.move_lines if move.result_package_id.id == pack.id]
+            skybill_data.update(chronopost_obj._complete_skybill(pack.shipping_weight, moves, rank))
+            if chrono_config.use_esd:
+                esd_data = chronopost_obj._prepare_esd(moves)
+            else:
+                esd_data = None
+            try:
+                resp = Chronopost().get_shipping_label(
+                    recipient_data, shipper_data,
+                    header_data, ref_data, skybill_data, password,
+                    esd=esd_data, mode=mode, customer=customer_data)
+            except (InvalidSize,
+                    InvalidType,
+                    InvalidValueNotInList,
+                    InvalidMissingField) as e:
+                msg = map_exception_msg(e.message)
+                raise orm.except_orm('Error', msg)
+            label = resp['value']
+            _logger.info("Retour API %r" % label)
+            if label['errorCode'] != 0:
+                try:
+                    error = ''.join(label['errorMessage'])
+                except:
+                    error = str(label['errorCode'])
+                raise orm.except_orm('Webservice Error', error)
+
+            # copy tracking number on picking if only one pack or
+            # in tracking if several packs
+            tracking_number = label['skybillNumber']
+            pack.parcel_tracking = tracking_number
+
+            file_type = 'pdf' if mode != 'ZPL' else 'zpl'
+            labels.append({
+                'file': base64.b64decode(label['skybill']),
+                'tracking_id': track.id if track else False,
+                'file_type': file_type,
+                'name': tracking_number + '.' + file_type,
+            })
+            
         return labels
 
-    def generate_shipping_labels(self, tracking_ids=None):
+    def generate_shipping_labels(self, package_ids=None):
         """ Add label generation for Chronopost """
         self.ensure_one()
 
         picking = self
 
         if picking.carrier_id and picking.carrier_id.carrier_type == 'chronopost':
-            return self._generate_chronopost_label(picking, tracking_ids=tracking_ids)
-        return super(StockPicking, self).generate_shipping_labels(package_ids=tracking_ids)
+            return self._generate_chronopost_label(picking, package_ids=package_ids)
+        return super(StockPicking, self).generate_shipping_labels(package_ids=package_ids)
 
 
 class ShippingLabel(models.Model):

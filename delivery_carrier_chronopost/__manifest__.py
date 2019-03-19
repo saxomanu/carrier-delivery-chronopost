@@ -41,11 +41,11 @@ Contributors
 """,
     'website': 'http://www.akretion.com/',
     'data': [
-        "company_view.xml",
-        "res_partner_data.xml",
-        "product_data.xml",
-        "delivery_data.xml",
-        "config_view.xml",
+        "views/company_view.xml",
+        "data/res_partner_data.xml",
+        "data/product_data.xml",
+        "data/delivery_data.xml",
+        "views/config_view.xml",
         "security/ir.model.access.csv"
         ],
     'installable': True,
