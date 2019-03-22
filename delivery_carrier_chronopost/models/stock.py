@@ -20,6 +20,7 @@
 ##############################################################################
 
 from odoo import models, fields, api, _
+from odoo import exceptions
 from chronopost_api.chronopost import Chronopost
 from datetime import datetime
 from chronopost_api.exception_helper import (
@@ -136,10 +137,10 @@ class ChronopostPrepareWebservice(models.AbstractModel):
         picking = moves[0].picking_id
         res['weight'] = weight
         product_total = int(sum(
-            m.sale_line_id.price_subtotal if m.sale_line_id
+            m.procurement_id.sale_line_id.price_subtotal if m.procurement_id.sale_line_id
             else 0 for m in moves)
             * 100)
-        res['skybillRank'] = rank
+        res['skybillRank'] = str(rank)
         if self._get_single_option(picking, 'insurance'):
             res['insuredValue'] = product_total or None
         if picking.carrier_id.name == "Chrono Express":
@@ -154,7 +155,7 @@ class ChronopostPrepareWebservice(models.AbstractModel):
             'weightUnit': 'KGM',
             #'codValue': TODO
         }
-        skybill_data['bulkNumber'] = picking.number_of_packages
+        skybill_data['bulkNumber'] = str(picking.number_of_packages)
         skybill_data['service'] = self._get_single_option(
             picking, 'service') or '0'
         skybill_data['objectType'] = self._get_single_option(
@@ -207,7 +208,7 @@ class StockPicking(models.Model):
             else:
                 chrono_config = chronopost_obj.get_chronopost_account(company, picking)
         else:
-            raise orm.except_orm(
+            raise exceptions.except_orm(
                 _('Error'),
                 _("You have to configurate a chronopost account "
                   "for your company"))
@@ -257,7 +258,7 @@ class StockPicking(models.Model):
                     InvalidValueNotInList,
                     InvalidMissingField) as e:
                 msg = map_exception_msg(e.message)
-                raise orm.except_orm('Error', msg)
+                raise exceptions.except_orm('Error', msg)
             label = resp['value']
             _logger.info("Retour API %r" % label)
             if label['errorCode'] != 0:
@@ -265,7 +266,7 @@ class StockPicking(models.Model):
                     error = ''.join(label['errorMessage'])
                 except:
                     error = str(label['errorCode'])
-                raise orm.except_orm('Webservice Error', error)
+                raise exceptions.except_orm('Webservice Error', error)
 
             # copy tracking number on picking if only one pack or
             # in tracking if several packs
@@ -275,14 +276,14 @@ class StockPicking(models.Model):
             file_type = 'pdf' if mode != 'ZPL' else 'zpl'
             labels.append({
                 'file': base64.b64decode(label['skybill']),
-                'tracking_id': track.id if track else False,
+                'package_id': False,
                 'file_type': file_type,
                 'name': tracking_number + '.' + file_type,
             })
         rank = 0
         for pack in package_label_ids:
             rank += 1
-            moves = [move for move in picking.move_lines if move.result_package_id.id == pack.id]
+            moves = self.pack_operation_product_ids.filtered(lambda r: r.result_package_id.id == pack.id).mapped('linked_move_operation_ids.move_id')
             skybill_data.update(chronopost_obj._complete_skybill(pack.shipping_weight, moves, rank))
             if chrono_config.use_esd:
                 esd_data = chronopost_obj._prepare_esd(moves)
@@ -298,7 +299,7 @@ class StockPicking(models.Model):
                     InvalidValueNotInList,
                     InvalidMissingField) as e:
                 msg = map_exception_msg(e.message)
-                raise orm.except_orm('Error', msg)
+                raise exceptions.except_orm('Error', msg)
             label = resp['value']
             _logger.info("Retour API %r" % label)
             if label['errorCode'] != 0:
@@ -306,7 +307,7 @@ class StockPicking(models.Model):
                     error = ''.join(label['errorMessage'])
                 except:
                     error = str(label['errorCode'])
-                raise orm.except_orm('Webservice Error', error)
+                raise exceptions.except_orm('Webservice Error', error)
 
             # copy tracking number on picking if only one pack or
             # in tracking if several packs
@@ -316,7 +317,7 @@ class StockPicking(models.Model):
             file_type = 'pdf' if mode != 'ZPL' else 'zpl'
             labels.append({
                 'file': base64.b64decode(label['skybill']),
-                'tracking_id': track.id if track else False,
+                'package_id': pack.id,
                 'file_type': file_type,
                 'name': tracking_number + '.' + file_type,
             })
