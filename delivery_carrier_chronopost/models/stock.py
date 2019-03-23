@@ -321,7 +321,6 @@ class StockPicking(models.Model):
                 'file_type': file_type,
                 'name': tracking_number + '.' + file_type,
             })
-            
         return labels
 
     def generate_shipping_labels(self, package_ids=None):
@@ -334,21 +333,3 @@ class StockPicking(models.Model):
             return self._generate_chronopost_label(picking, package_ids=package_ids)
         return super(StockPicking, self).generate_shipping_labels(package_ids=package_ids)
 
-
-class ShippingLabel(models.Model):
-    """ Child class of ir attachment to identify which are labels """
-    _inherit = 'shipping.label'
-
-    def _get_file_type_selection(self):
-        """ Return a concatenated list of extensions of label file format
-        plus file format from super
-
-        This will be filtered and sorted in __get_file_type_selection
-
-        :return: list of tuple (code, name)
-
-        """
-        file_types = super(ShippingLabel, self)._get_file_type_selection()
-        new_types = [('zpl', 'ZPL')]
-        file_types.extend(new_types)
-        return file_types
