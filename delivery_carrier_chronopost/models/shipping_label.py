@@ -24,9 +24,14 @@ class ShippingLabel(models.Model):
         res.append(('zpl', 'ZPL'))
         return res
 
+
+class IrAttachment(models.Model):
+    _inherit = 'ir.attachment'
+
     @api.multi
     def unlink(self):
-        for rec in self:
+        labels = self.env['shipping.label'].search([('attachment_id', 'in', self.ids)])
+        for rec in labels:
             company = rec.company_id
             if company.chronopost_account_ids:
                 chrono_config = company.chronopost_account_ids[0]
@@ -62,4 +67,4 @@ class ShippingLabel(models.Model):
                     except:
                         error = str(label['errorCode'])
                     raise exceptions.except_orm('Webservice Error', error)
-        return super(ShippingLabel, self).unlink()
+        return super(IrAttachment, self).unlink()
