@@ -49,6 +49,15 @@ def map_exception_msg(message):
     return message
 
 
+class StockQuantPackage(models.Model):
+    _inherit = 'stock.quant.package'
+    parcel_tracking_uri = fields.Char(compute='_compute_uri')
+
+    def _compute_uri(self):
+        for rec in self:
+            rec.parcel_tracking_uri = 'https://www.chronopost.fr/tracking-no-cms/suivi-page?langue=fr_FR&listeNumerosLT=' + rec.parcel_tracking
+
+
 class ChronopostPrepareWebservice(models.AbstractModel):
     _name = 'chronopost.prepare.webservice'
 
@@ -197,6 +206,13 @@ class ChronopostPrepareWebservice(models.AbstractModel):
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
+    package_ids = fields.One2many('stock.quant.package', compute='_get_package')
+
+    def _get_package(self):
+        for rec in self:
+            packs = rec.mapped('pack_operation_product_ids.result_package_id')
+            rec.package_ids = [(6, 0, packs.ids)]
+
     def _generate_chronopost_label(self, picking, package_ids=None):
         """ Generate labels and write tracking numbers received """
         chronopost_obj = self.env['chronopost.prepare.webservice']
@@ -333,3 +349,9 @@ class StockPicking(models.Model):
             return self._generate_chronopost_label(picking, package_ids=package_ids)
         return super(StockPicking, self).generate_shipping_labels(package_ids=package_ids)
 
+    @api.multi
+    def write(self, values):
+        for picking in self:
+            if 'date_done' in values and picking.state == 'done' and picking.carrier_type == 'chronopost':
+                picking.generate_labels()
+        return super(StockPicking, self).write(values)

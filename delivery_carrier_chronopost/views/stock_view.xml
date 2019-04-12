@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_quant_package_form" model="ir.ui.view">
+        <field name="model">stock.quant.package</field>
+        <field name="inherit_id" ref="stock.view_quant_package_form"/>
+        <field name="arch" type="xml">
+          <field name="parcel_tracking_uri" position="attributes"> 
+            <attribute name="widget">url</attribute>           
+          </field>
+          <field name="weight" position="replace"/>
+        </field>
+    </record>
+    
+    <record id="view_picking_withcarrier_out_form" model="ir.ui.view">
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="base_delivery_carrier_label.view_picking_withcarrier_out_form"/>
+        <field name="arch" type="xml">
+          <xpath expr="//page//group[@name='carrier_data']/.." position="after">
+            <field name="package_ids">
+                <tree>
+                    <field name="name" />
+                    <field name="parcel_tracking" />
+                    <field name="parcel_tracking_uri" widget="url" />
+                </tree>
+            </field>
+          </xpath>
+        </field>
+    </record>
+</odoo>

@@ -46,6 +46,7 @@ Contributors
         "data/product_data.xml",
         "data/delivery_data.xml",
         "views/config_view.xml",
+        "views/stock_view.xml",
         "security/ir.model.access.csv"
         ],
     'installable': True,
