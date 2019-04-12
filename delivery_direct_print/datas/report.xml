@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="ship_label" model="ir.actions.report.xml">
+            <field name="name">Etiquette de livraison</field>
+            <field name="model">stock.picking</field>
+            <field name="report_name">stock.report_ship_label</field>
+            <field name="report_type">qweb-pdf</field>
+        </record>
+    </data>
+</odoo>
