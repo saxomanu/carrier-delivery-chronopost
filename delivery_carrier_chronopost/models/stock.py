@@ -347,11 +347,19 @@ class StockPicking(models.Model):
         self.ensure_one()
 
         picking = self
+        
+        # ensure not yet shipping label
+        labels = self.env['shipping.label'].search([
+            ('res_id', 'in', self.ids),
+            ('res_model', '=', 'stock.picking')])
+        if labels:
+            raise exceptions.UserError('Des étiquettes sont déjà présentes. Veuiller les supprimer avant d\'en générer de nouvelles')
 
         if picking.carrier_id and picking.carrier_id.carrier_type == 'chronopost':
             return self._generate_chronopost_label(picking, package_ids=package_ids)
         return super(StockPicking, self).generate_shipping_labels(package_ids=package_ids)
 
+    
     @api.multi
     def write(self, values):
         for picking in self:
