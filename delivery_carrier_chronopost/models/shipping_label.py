@@ -61,7 +61,7 @@ class IrAttachment(models.Model):
                     raise exceptions.except_orm('Error', e.message)
                 label = resp['value']
                 _logger.info("Retour API %r" % label)
-                if label['errorCode'] != 0:
+                if label['errorCode'] != 0 and label['errorCode'] != 2:
                     try:
                         error = ''.join(label['errorMessage'])
                     except:
