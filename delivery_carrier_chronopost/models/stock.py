@@ -55,7 +55,10 @@ class StockQuantPackage(models.Model):
 
     def _compute_uri(self):
         for rec in self:
-            rec.parcel_tracking_uri = 'https://www.chronopost.fr/tracking-no-cms/suivi-page?langue=fr_FR&listeNumerosLT=' + rec.parcel_tracking
+            if rec.parcel_tracking:
+                rec.parcel_tracking_uri = 'https://www.chronopost.fr/tracking-no-cms/suivi-page?langue=fr_FR&listeNumerosLT=' + rec.parcel_tracking
+            else:
+                rec.parcel_tracking_uri = ''
 
 
 class ChronopostPrepareWebservice(models.AbstractModel):
