@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, api
+from odoo import models, fields, api
 
 
 class Report(models.Model):
@@ -31,6 +31,22 @@ class Report(models.Model):
 
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
+
+    @api.multi
+    def _get_label(self):
+        # report = self.env['report']
+        # report.get_pdf(self.ids, 'tevah_stock_reports.report_delivery_bl_client_jsi')
+        # report.get_label(self.ids, 'stock.report_ship_label')
+        labels = self.env['shipping.label'].search([
+            ('res_id', 'in', self.ids),
+            ('res_model', '=', 'stock.picking')])
+        document = ""
+        for label in labels:
+            document += label.datas.decode('base64')
+        for rec in self:
+            rec.label_zpl = document
+
+    label_zpl = fields.Text(compute='_get_label')
 
     @api.multi
     def print_delivery(self):

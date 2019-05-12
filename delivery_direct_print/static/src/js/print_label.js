@@ -8,15 +8,14 @@ form_widget.WidgetButton.include({
     on_click: function() {
         var self = this;
          if(this.node.attrs.custom === "print_label"){
-            self.on_confirmed().then(function(result)
-             {
+            var result = self.field_manager.datarecord.label_zpl;
             var printWindow = window.open();
             printWindow.document.open('text/plain')
             printWindow.document.write(result);
             printWindow.document.close();
             printWindow.focus();
             printWindow.print();
-            printWindow.close();})
+            printWindow.close();
          return;
          }
          this._super();
