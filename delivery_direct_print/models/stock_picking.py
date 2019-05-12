@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class Report(models.Model):
@@ -43,6 +46,8 @@ class StockPicking(models.Model):
         document = ""
         for label in labels:
             if label.datas:
+                _logger.info(label.datas)
+                _logger.info(label.datas.decode('base64'))
                 document += label.datas.decode('base64')
         for rec in self:
             rec.label_zpl = document
