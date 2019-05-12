@@ -6,8 +6,9 @@ var _t = core._t;
 var QWeb = core.qweb;
 form_widget.WidgetButton.include({
     on_click: function() {
+        var self = this;
          if(this.node.attrs.custom === "print_label"){
-            this._super().then(
+            self._super().then(
             function(result) {
             var printWindow = window.open();
             printWindow.document.open('text/plain')
