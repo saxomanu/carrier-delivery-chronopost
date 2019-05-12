@@ -8,8 +8,9 @@ form_widget.WidgetButton.include({
     on_click: function() {
         var self = this;
          if(this.node.attrs.custom === "print_label"){
-            self._super().then(
-            function(result) {
+            var model = new instance.web.Model("stock.picking");
+            model.call("print_delivery", {context: new instance.web.CompoundContext()}).then(function(result)
+             {
             var printWindow = window.open();
             printWindow.document.open('text/plain')
             printWindow.document.write(result);
