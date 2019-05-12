@@ -7,5 +7,12 @@
             <field name="report_name">stock.report_ship_label</field>
             <field name="report_type">qweb-pdf</field>
         </record>
+        
+        <template id="assets_backend" name="label_assets" inherit_id="web.assets_backend">
+            <xpath expr="." position="inside">
+                <script type="text/javascript" src="/delivery_direct_print/static/src/js/print_label.js"/>
+            </xpath>
+    </template>
+
     </data>
 </odoo>
