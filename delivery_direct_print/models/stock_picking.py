@@ -46,8 +46,8 @@ class StockPicking(models.Model):
         document = ""
         for label in labels:
             if label.datas:
-                _logger.info(label.datas)
-                _logger.info(label.datas.decode('base64'))
+                _logger.info(label.with_context(bin_size=False).datas)
+                _logger.info(label.with_context(bin_size=False).datas.decode('base64'))
                 document += label.datas.decode('base64')
         for rec in self:
             rec.label_zpl = document
