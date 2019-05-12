@@ -42,7 +42,8 @@ class StockPicking(models.Model):
             ('res_model', '=', 'stock.picking')])
         document = ""
         for label in labels:
-            document += label.datas.decode('base64')
+            if label.datas:
+                document += label.datas.decode('base64')
         for rec in self:
             rec.label_zpl = document
 
