@@ -9,6 +9,9 @@
                 <xpath expr="//button[@name='action_generate_carrier_label']" position="after">
                     <button name="print_delivery" string="Imprimer Etiquette(s)" custom="print_label" groups="stock.group_stock_user" type="object" states="done" />
                 </xpath>
+                <xpath expr="//form" position="inside">
+                    <field name="label_zpl" invisible="1" />
+                </xpath>
             </field>
         </record>
     </data>
