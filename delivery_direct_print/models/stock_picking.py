@@ -41,11 +41,12 @@ class StockPicking(models.Model):
             labels = self.env['shipping.label'].search([
                 ('res_id', '=', rec.id),
                 ('res_model', '=', 'stock.picking')])
-            document = ""
+            document = "<![CDATA["
             for label in labels:
                 if label.datas:
                     document += label.with_context(bin_size=False).datas.decode('base64')
-            rec.label_zpl = document
+            document += "]]>"
+            rec.label_zpl = document.encode('base64')
 
     label_zpl = fields.Text(compute='_get_label')
 
