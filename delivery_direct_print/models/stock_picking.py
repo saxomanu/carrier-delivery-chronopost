@@ -38,12 +38,10 @@ class StockPicking(models.Model):
     @api.multi
     def _get_label(self):
         for rec in self:
-            _logger.info('==========================> rec.id %r' % rec.id)
             labels = self.env['shipping.label'].search([
                 ('res_id', '=', rec.id),
                 ('res_model', '=', 'stock.picking')])
             document = ""
-            _logger.info('==========================> labels %r' % labels)
             for label in labels:
                 if label.datas:
                     document += label.with_context(bin_size=False).datas.decode('base64')
