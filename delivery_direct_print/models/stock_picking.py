@@ -37,13 +37,12 @@ class StockPicking(models.Model):
 
     @api.multi
     def _get_label(self):
-        # report = self.env['report']
-        # report.get_pdf(self.ids, 'tevah_stock_reports.report_delivery_bl_client_jsi')
-        # report.get_label(self.ids, 'stock.report_ship_label')
+        _logger.info('==========================> self.ids %r' % self.ids)
         labels = self.env['shipping.label'].search([
             ('res_id', 'in', self.ids),
             ('res_model', '=', 'stock.picking')])
         document = ""
+        _logger.info('==========================> labels %r' % labels)
         for label in labels:
             if label.datas:
                 document += label.with_context(bin_size=False).datas.decode('base64')
