@@ -37,9 +37,9 @@ class StockPicking(models.Model):
 
     @api.multi
     def _get_label(self):
-        _logger.info('==========================> self.ids %r' % self.ids)
+        _logger.info('==========================> self.id %r' % self.id)
         labels = self.env['shipping.label'].search([
-            ('res_id', 'in', self.ids),
+            ('res_id', '=', self.id),
             ('res_model', '=', 'stock.picking')])
         document = ""
         _logger.info('==========================> labels %r' % labels)
