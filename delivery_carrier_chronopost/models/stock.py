@@ -49,6 +49,15 @@ def map_exception_msg(message):
     return message
 
 
+class PackOperation(models.Model):
+    _inherit = 'stock.pack.operation'
+
+    def manage_unpack(self):
+        for rec in self:
+            rec.result_package_id = False
+        return True
+
+
 class StockQuantPackage(models.Model):
     _inherit = 'stock.quant.package'
     parcel_tracking_uri = fields.Char(compute='_compute_uri')
@@ -347,7 +356,7 @@ class StockPicking(models.Model):
         self.ensure_one()
 
         picking = self
-        
+
         # ensure not yet shipping label
         labels = self.env['shipping.label'].search([
             ('res_id', 'in', self.ids),
@@ -359,10 +368,12 @@ class StockPicking(models.Model):
             return self._generate_chronopost_label(picking, package_ids=package_ids)
         return super(StockPicking, self).generate_shipping_labels(package_ids=package_ids)
 
-    
     @api.multi
     def write(self, values):
         for picking in self:
             if 'date_done' in values and picking.state == 'done' and picking.carrier_type == 'chronopost':
+                for pack in picking.pack_operation_ids:
+                    if pack.qty_done and not pack.result_package_id:
+                        raise exceptions.except_orm('Pass de colis', 'Veuiller mettre tous les produits dans un colis')
                 picking.generate_labels()
         return super(StockPicking, self).write(values)
