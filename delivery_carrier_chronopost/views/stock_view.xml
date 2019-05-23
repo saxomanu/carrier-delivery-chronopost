@@ -25,7 +25,7 @@
             </field>
           </xpath>
           <field name="result_package_id" position="before">
-                    <button name="manage_unpack" string="Defaire du colis" type="object" icon="fa-eject" groups="stock.group_tracking_lot" attrs="{'invisible': [('result_package_id','=', False)]}"/>
+                    <button name="manage_unpack" string="Defaire du colis" type="object" icon="fa-eject" groups="stock.group_tracking_lot" attrs="{'invisible': ['|', ('result_package_id','=', False), ('state', '=', 'done')]}"/>
             </field>
         </field>
     </record>
