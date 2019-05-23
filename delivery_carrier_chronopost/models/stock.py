@@ -375,5 +375,7 @@ class StockPicking(models.Model):
                 for pack in picking.pack_operation_ids:
                     if pack.qty_done and not pack.result_package_id:
                         raise exceptions.except_orm('Pass de colis', 'Veuiller mettre tous les produits dans un colis')
-                picking.generate_labels()
+                company = picking.company_id
+                if company.chronopost_account_ids:
+                    picking.generate_labels()
         return super(StockPicking, self).write(values)
